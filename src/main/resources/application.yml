@@ -2,6 +2,17 @@ spring:
   application:
     name: skala-shop-api
 
+  ai:
+    mcp:
+      server:
+        enabled: true
+        name: skala-shop-mcp-server
+        version: 1.0.0
+        type: SYNC
+        protocol: STREAMABLE
+        annotation-scanner:
+          enabled: true
+
   datasource:
     url: jdbc:h2:mem:shopdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver

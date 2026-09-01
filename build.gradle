@@ -34,6 +34,11 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
+
+	// mcp를 위한 의존성 추가
+	// Spring AI 관련 라이브러리들의 버전을 2.0.1로 통일하는 BOM 설정
+	implementation platform('org.springframework.ai:spring-ai-bom:2.0.1')
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
 }
 
 tasks.named('test') {
