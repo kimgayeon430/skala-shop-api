@@ -1,6 +1,6 @@
 # skala-shop
 
-> 포인트 기반 주문 도메인을 REST API와 MCP Tool로 제공하는 풀스택 쇼핑몰
+> Spring Boot REST API 실습에서 출발해, Spring AI 기반 MCP 서버로 확장한 포인트 쇼핑몰
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?style=flat-square&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1.0-6DB33F?style=flat-square&logo=springboot&logoColor=white)
@@ -8,9 +8,69 @@
 ![H2](https://img.shields.io/badge/H2-In--Memory-09476B?style=flat-square)
 ![Frontend](https://img.shields.io/badge/Frontend-Vanilla_JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
 
-`skala-shop`은 고객이 가입 시 지급받은 포인트로 상품을 주문하고, 주문 취소 시 포인트를 환불받는 학습용 쇼핑몰입니다. Spring Boot 기반 REST API 위에 반응형 웹 UI를 구현했으며, 동일한 Service 로직을 MCP Tool로도 노출해 AI 클라이언트가 상품과 고객 정보를 조회할 수 있도록 구성했습니다.
+`skala-shop`은 고객이 가입 시 지급받은 포인트로 상품을 주문하고, 주문 취소 시 포인트를 환불받는 학습용 쇼핑몰입니다. 처음에는 Spring Boot로 Controller–Service–Repository 구조와 REST API를 구현했고, 이후 반응형 웹 UI와 Spring AI MCP 서버를 더해 **사람과 AI가 같은 비즈니스 기능을 서로 다른 인터페이스로 사용하는 애플리케이션**으로 발전시켰습니다.
 
-![skala-shop 메인 화면](docs/images/home.png)
+![skala-shop 메인 화면](docs/images/home-portfolio.png)
+
+## Spring Boot 실습에서 Spring AI 프로젝트로
+
+이 프로젝트의 핵심은 완전히 새로운 AI 애플리케이션을 별도로 만든 것이 아니라, **기존 Spring Boot 애플리케이션의 잘 분리된 Service 계층을 Spring AI로 확장했다는 점**입니다.
+
+### Before — Spring Boot REST API
+
+초기 버전에서는 웹 클라이언트가 HTTP Endpoint를 통해서만 기능을 사용할 수 있었습니다.
+
+```text
+Web Client → REST Controller → Service → Repository → H2
+```
+
+- 상품과 고객 CRUD API 구현
+- 회원가입과 로그인 흐름 구현
+- 포인트 기반 주문·취소 로직 구현
+- JPA Entity 연관관계와 트랜잭션 처리
+- Bean Validation과 전역 예외 처리 구성
+
+이 단계에서 Controller는 요청과 응답을 담당하고, 실제 상품·고객·주문 규칙은 Service에 모았습니다. 이 구조가 이후 MCP 전환에서 비즈니스 로직을 다시 작성하지 않을 수 있었던 기반이 됐습니다.
+
+### Upgrade — Spring AI MCP Server 추가
+
+Spring AI의 MCP Server WebMVC Starter를 도입하고, 기존 Service 메서드를 호출하는 `@McpTool` 계층을 추가했습니다.
+
+```text
+Web Client ──→ REST Controller ─┐
+                               ├─→ Service → Repository → H2
+AI Client ──→ MCP Tool ────────┘
+```
+
+```java
+@McpTool(
+    name = "list_products",
+    description = "쇼핑몰에 등록된 모든 상품의 ID, 이름, 가격을 조회합니다."
+)
+public List<ProductResponse> listProducts() {
+    return productService.findAll();
+}
+```
+
+MCP Tool은 Repository에 직접 접근하지 않습니다. REST Controller와 마찬가지로 기존 Service를 호출하므로 데이터 조회 방식과 업무 규칙이 일관되게 유지됩니다.
+
+### After — REST와 MCP를 함께 제공
+
+| Spring Boot 실습 단계 | Spring AI 확장 단계 |
+| --- | --- |
+| 사람과 웹 UI를 위한 REST Endpoint | AI가 발견하고 호출할 수 있는 MCP Tool |
+| `/api/products`, `/api/customers` | `list_products`, `get_customer` 등 |
+| HTTP JSON 요청·응답 | MCP 표준 Tool Schema와 실행 결과 |
+| Swagger UI를 이용한 API 검증 | MCP Inspector를 이용한 Tool 검증 |
+| Controller 단일 진입점 | REST Controller와 MCP Tool의 이중 진입점 |
+
+최종적으로 Spring Boot 서버 하나가 다음 인터페이스를 동시에 제공합니다.
+
+- `http://localhost:8080` — 사용자가 이용하는 쇼핑몰 UI
+- `http://localhost:8080/api/**` — 프론트엔드와 외부 시스템을 위한 REST API
+- `http://localhost:8080/mcp` — AI 클라이언트를 위한 Streamable HTTP MCP Endpoint
+
+이를 통해 기존 백엔드를 훼손하거나 복제하지 않고 **AI가 사용할 수 있는 도구 서버로 점진적으로 확장하는 경험**을 구현했습니다.
 
 ## 프로젝트 핵심
 
@@ -18,7 +78,7 @@
 | --- | --- |
 | Backend | 상품·고객 CRUD, 로그인, 포인트 주문 및 취소, 페이지 조회 |
 | Frontend | 상품 탐색, 회원가입·로그인, 주문, 주문 내역, 상품 관리 UI |
-| MCP | Streamable HTTP 기반 MCP 서버와 조회 Tool 4종 제공 |
+| Spring AI | 기존 Service를 재사용하는 Streamable HTTP MCP 서버와 조회 Tool 4종 제공 |
 | Data | Spring Data JPA와 H2 인메모리 DB, 초기 상품 데이터 구성 |
 | Reliability | Bean Validation, 업무 예외 분리, 일관된 오류 응답, 트랜잭션 처리 |
 
@@ -30,7 +90,7 @@
 
 | 상품 목록 | 주문 |
 | --- | --- |
-| ![상품 목록](docs/images/products.png) | ![상품 주문](docs/images/order-modal.png) |
+| ![상품 목록](docs/images/products-portfolio.png) | ![상품 주문](docs/images/order-modal-portfolio.png) |
 
 ### 주문 내역과 상품 관리
 
@@ -38,14 +98,14 @@
 
 | 주문 내역 | 상품 관리 |
 | --- | --- |
-| ![주문 내역](docs/images/orders.png) | ![상품 관리](docs/images/product-admin.png) |
+| ![주문 내역](docs/images/orders-portfolio.png) | ![상품 관리](docs/images/product-admin-portfolio.png) |
 
 <details>
 <summary><strong>회원가입·로그인 화면 보기</strong></summary>
 
 | 회원가입 | 로그인 |
 | --- | --- |
-| ![회원가입](docs/images/signup.png) | ![로그인](docs/images/login.png) |
+| ![회원가입](docs/images/signup-portfolio.png) | ![로그인](docs/images/login-portfolio.png) |
 
 </details>
 
